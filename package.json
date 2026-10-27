@@ -1,0 +1,28 @@
+{
+  "name": "agente-oc-periferia",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "demo": "bun run demo.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.89",
+    "@ai-sdk/react": "^4.0.158",
+    "ai": "^7.0.154",
+    "next": "^16.4.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5"
+  }
+}
