@@ -44,33 +44,45 @@ function auditarDecisiones(messages: UIMessage[]) {
   }
 }
 
+/** Lo único que ve el usuario cuando algo falla; el detalle técnico va solo a los logs del servidor. */
+const MENSAJE_GENERICO = "No pude procesar la solicitud, intenta de nuevo";
+
+function respuestaDeError(detalle: unknown) {
+  console.error("[api/chat]", detalle);
+  return Response.json({ error: MENSAJE_GENERICO }, { status: 500 });
+}
+
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return Response.json(
-      { error: "Falta la variable de entorno ANTHROPIC_API_KEY en el servidor." },
-      { status: 500 },
-    );
+    return respuestaDeError("Falta la variable de entorno ANTHROPIC_API_KEY en el servidor.");
   }
 
-  const { messages } = (await req.json()) as { messages: UIMessage[] };
-  auditarDecisiones(messages);
+  try {
+    const { messages } = (await req.json()) as { messages: UIMessage[] };
+    auditarDecisiones(messages);
 
-  const tools = crearHerramientas({ sap, actor: "agente" });
-  const result = streamText({
-    model: anthropic(process.env.ANTHROPIC_MODEL || MODELO_POR_DEFECTO),
-    system: await cargarSystemPrompt(),
-    messages: await convertToModelMessages(messages, { tools }),
-    tools,
-    toolApproval: Object.fromEntries(herramientasConConfirmacion.map((h) => [h, "user-approval" as const])),
-    stopWhen: isStepCount(10),
-  });
-
-  return createUIMessageStreamResponse({
-    stream: toUIMessageStream({
-      stream: result.stream,
+    const tools = crearHerramientas({ sap, actor: "agente" });
+    const result = streamText({
+      model: anthropic(process.env.ANTHROPIC_MODEL || MODELO_POR_DEFECTO),
+      system: await cargarSystemPrompt(),
+      messages: await convertToModelMessages(messages, { tools }),
       tools,
-      originalMessages: messages,
-      onError: (error) => (error instanceof Error ? error.message : "Error inesperado en el servidor."),
-    }),
-  });
+      toolApproval: Object.fromEntries(herramientasConConfirmacion.map((h) => [h, "user-approval" as const])),
+      stopWhen: isStepCount(10),
+    });
+
+    return createUIMessageStreamResponse({
+      stream: toUIMessageStream({
+        stream: result.stream,
+        tools,
+        originalMessages: messages,
+        onError: (error) => {
+          console.error("[api/chat]", error);
+          return MENSAJE_GENERICO;
+        },
+      }),
+    });
+  } catch (error) {
+    return respuestaDeError(error);
+  }
 }

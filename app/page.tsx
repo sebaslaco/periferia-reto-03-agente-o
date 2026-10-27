@@ -23,14 +23,8 @@ const ESTADOS: Record<ParteHerramienta["state"], { texto: string; clase: string 
   "output-denied": { texto: "Cancelada por el usuario", clase: "error" },
 };
 
-/** El backend responde errores como {"error": "..."}; mostramos solo el texto. */
-function mensajeDeError(error: Error): string {
-  try {
-    const cuerpo = JSON.parse(error.message) as { error?: unknown };
-    if (typeof cuerpo.error === "string") return cuerpo.error;
-  } catch {}
-  return error.message;
-}
+/** Mensaje único para cualquier error: el detalle técnico queda solo en los logs del servidor. */
+const MENSAJE_ERROR = "No pude procesar la solicitud, intenta de nuevo";
 
 function Json({ valor }: { valor: unknown }) {
   return <pre className="json">{JSON.stringify(valor, null, 2)}</pre>;
@@ -66,7 +60,7 @@ function TarjetaHerramienta({
           <Json valor={part.output} />
         </>
       )}
-      {part.state === "output-error" && <div className="error-texto">{part.errorText}</div>}
+      {part.state === "output-error" && <div className="error-texto">{MENSAJE_ERROR}</div>}
       {pideConfirmacion && (
         <div className="confirmacion">
           <p>Esta acción necesita aprobación humana antes de ejecutarse. ¿Deseas continuar?</p>
@@ -124,7 +118,7 @@ export default function Chat() {
           </div>
         ))}
         {status === "submitted" && <div className="pensando">Pensando…</div>}
-        {error && <div className="error-global">Ocurrió un error: {mensajeDeError(error)}</div>}
+        {error && <div className="error-global">{MENSAJE_ERROR}</div>}
         <div ref={finRef} />
       </section>
 
