@@ -8,7 +8,7 @@
 import { SapSimulado } from "./src/sap/sap-simulado";
 import { crearRegistroDemo, ping, registrarDecisionHumana, type ContextoHerramientas } from "./src/tools/oc";
 
-const sap = new SapSimulado({ reloj: () => new Date("2026-01-01T00:00:00.000Z") });
+const sap = new SapSimulado({ reloj: () => new Date("2026-01-01T08:00:00-05:00") });
 const agente: ContextoHerramientas = { sap, actor: "demo" };
 const usuario: ContextoHerramientas = { sap, actor: "usuario-demo" };
 

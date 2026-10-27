@@ -8,12 +8,13 @@
  * Nota: al ser memoria, en Vercel los datos se reinician cuando la función se recicla.
  * Para producción se reemplaza por un adaptador SAP real con la misma interfaz.
  */
+import { fechaColombia } from "../fechas";
 
 export type ResultadoAuditoria = "ok" | "rechazado" | "duplicado" | "aprobado" | "cancelado" | "error";
 
 export interface EventoAuditoria {
   id: number;
-  fecha: string; // ISO 8601
+  fecha: string; // ISO 8601 en hora de Colombia
   actor: string; // quién: "agente", "usuario", "demo", ...
   accion: string; // qué: nombre de la herramienta o decisión
   solicitudId?: string;
@@ -56,7 +57,7 @@ export class SapSimulado {
   }
 
   ahora(): string {
-    return this.reloj().toISOString();
+    return fechaColombia(this.reloj());
   }
 
   registrarAuditoria(evento: Omit<EventoAuditoria, "id" | "fecha">): EventoAuditoria {

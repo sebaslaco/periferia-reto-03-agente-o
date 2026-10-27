@@ -39,6 +39,18 @@ header p { margin: 4px 0 12px; color: var(--suave); font-size: 0.9rem; }
 .autor { font-size: 0.75rem; font-weight: 600; color: var(--suave); margin-bottom: 4px; }
 .texto { margin: 4px 0; white-space: pre-wrap; line-height: 1.45; }
 
+.markdown { line-height: 1.5; overflow-x: auto; }
+.markdown > :first-child { margin-top: 4px; }
+.markdown > :last-child { margin-bottom: 4px; }
+.markdown p { margin: 6px 0; }
+.markdown ul, .markdown ol { margin: 6px 0; padding-left: 22px; }
+.markdown code { font-family: ui-monospace, monospace; background: #f0f2f5; padding: 1px 4px; border-radius: 4px; font-size: 0.85em; }
+.markdown pre { background: #f0f2f5; padding: 8px; border-radius: 6px; overflow-x: auto; }
+.markdown pre code { background: none; padding: 0; }
+.markdown table { border-collapse: collapse; margin: 8px 0; font-size: 0.9rem; }
+.markdown th, .markdown td { border: 1px solid var(--borde); padding: 6px 10px; text-align: left; }
+.markdown th { background: #f0f2f5; }
+
 .tarjeta { border: 1px solid var(--borde); border-left: 4px solid var(--suave); border-radius: 8px; padding: 8px 12px; margin: 8px 0; background: #fafbfc; }
 .tarjeta.ok { border-left-color: var(--ok); }
 .tarjeta.espera { border-left-color: var(--espera); background: #fffaf0; }

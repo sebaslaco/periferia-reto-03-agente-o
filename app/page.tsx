@@ -10,6 +10,8 @@ import {
   type ToolUIPart,
 } from "ai";
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type ParteHerramienta = ToolUIPart | DynamicToolUIPart;
 
@@ -110,7 +112,14 @@ export default function Chat() {
           <div key={m.id} className={`mensaje ${m.role}`}>
             <div className="autor">{m.role === "user" ? "Tú" : "Asistente"}</div>
             {m.parts.map((part, i) => {
-              if (part.type === "text") return <p key={i} className="texto">{part.text}</p>;
+              if (part.type === "text")
+                return m.role === "assistant" ? (
+                  <div key={i} className="markdown">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p key={i} className="texto">{part.text}</p>
+                );
               if (isToolUIPart(part))
                 return <TarjetaHerramienta key={part.toolCallId} part={part} responder={responder} ocupado={ocupado} />;
               return null;
