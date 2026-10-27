@@ -15,7 +15,7 @@ Chat web en español que conversa con Claude, llama herramientas tipadas con zod
 | `src/sap/sap-simulado.ts` | SAP simulado: consecutivo de OC, bloqueo de duplicados por id de solicitud y log de auditoría. |
 | `demo.ts` | Demo sin modelo de IA: llama las herramientas directamente; salida determinística. |
 | `fixtures/reto-03/` | Aquí van los maestros y casos del reto (`sol-001` a `sol-006`). |
-| `agent/SOLUCION.md` | Documento de la solución. |
+| `SOLUCION.md` | Documento de la solución (arquitectura, controles, adaptador SAP, análisis). |
 
 ## Requisitos
 
