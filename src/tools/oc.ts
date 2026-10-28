@@ -38,6 +38,7 @@ import {
   type ResultadoControl,
 } from "../infra/archivos";
 import { SapMock } from "../sap/mock";
+import { fechaColombia } from "../fechas";
 
 export type { ContextoHerramienta };
 
@@ -74,7 +75,7 @@ async function ejecutar<A extends z.ZodRawShape, T>(
       herramienta: `oc_${nombre}`,
       args: entrada,
       ok: resultado.ok,
-      ...(resultado.ok ? {} : { error: resultado.error }),
+      ...(resultado.ok ? { data: resultado.data } : { error: resultado.error }),
       duracion_ms: Date.now() - inicio,
     });
   } catch (e) {
@@ -239,8 +240,17 @@ export const crear = {
       const r = await recalcular(ctx, caso);
       const { solicitud_id } = r.paquete.solicitud;
       const { bloqueos, confirmaciones } = codigos(r.validacion);
-      const control = (resultado: ResultadoControl, numero_oc: string | null = null) =>
-        registrarControl(ctx, { solicitud_id, resultado, numero_oc, retroactiva: r.validacion.retroactiva, bloqueos, confirmaciones });
+      const control = (resultado: ResultadoControl, numero_oc: string | null = null, confirmacion: { por: string; en: string } | null = null) =>
+        registrarControl(ctx, {
+          solicitud_id,
+          resultado,
+          numero_oc,
+          retroactiva: r.validacion.retroactiva,
+          bloqueos,
+          confirmaciones,
+          confirmado_por: confirmacion?.por ?? null,
+          confirmado_en: confirmacion?.en ?? null,
+        });
       const sap = new SapMock(ctx);
 
       const existente = await sap.buscarOrdenPorReferencia(solicitud_id);
@@ -268,9 +278,15 @@ export const crear = {
         await control("rechazada");
         throw e;
       }
-      const orden: OrdenCompra = confirmaciones.length > 0 ? confirmarExcepciones(r.payload.orden, `analista (sesión ${ctx.sessionId})`) : r.payload.orden;
+      // Auditoría: quien confirmó (la sesión validada por el backend) y cuándo, en cada excepción.
+      const confirmacion = confirmaciones.length > 0 ? { por: `analista (sesión ${ctx.sessionId})`, en: fechaColombia(new Date()) } : null;
+      const orden: OrdenCompra = confirmacion ? confirmarExcepciones(r.payload.orden, confirmacion.por, confirmacion.en) : r.payload.orden;
+      if (orden.excepciones.some((x) => !x.confirmado_por || !x.confirmado_en)) {
+        await control("rechazada");
+        throw new ErrorHerramienta("No se crea la OC: hay excepciones sin confirmación registrada.");
+      }
       const creada = await sap.crearOrden(orden);
-      await control("creada", creada.numero_oc);
-      return { ...creada, idempotente: false, retroactiva: r.validacion.retroactiva };
+      await control("creada", creada.numero_oc, confirmacion);
+      return { ...creada, idempotente: false, retroactiva: r.validacion.retroactiva, excepciones: orden.excepciones };
     }),
 };

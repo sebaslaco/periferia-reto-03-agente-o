@@ -95,7 +95,7 @@ export function construirOrden(e: EntradaPayload): ResultadoPayload {
   return { ok: true, orden: valida.data, trazabilidad: traza };
 }
 
-/** Marca las excepciones como confirmadas por quien confirmó. */
-export function confirmarExcepciones(orden: OrdenCompra, confirmadoPor: string): OrdenCompra {
-  return { ...orden, excepciones: orden.excepciones.map((x) => ({ ...x, confirmado_por: confirmadoPor })) };
+/** Marca las excepciones como confirmadas por quien confirmó y cuándo. */
+export function confirmarExcepciones(orden: OrdenCompra, confirmadoPor: string, confirmadoEn: string): OrdenCompra {
+  return { ...orden, excepciones: orden.excepciones.map((x) => ({ ...x, confirmado_por: confirmadoPor, confirmado_en: confirmadoEn })) };
 }

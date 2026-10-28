@@ -150,7 +150,15 @@ export const ordenCompraSchema = z.object({
       }),
     )
     .min(1),
-  excepciones: z.array(z.object({ codigo: z.string(), detalle: z.string(), confirmado_por: z.string().nullable() })),
+  excepciones: z.array(
+    z.object({
+      codigo: z.string(),
+      detalle: z.string(),
+      confirmado_por: z.string().nullable(),
+      /** Fecha de la confirmación humana; se completa al crear la OC (auditoría). */
+      confirmado_en: z.string().nullable().optional(),
+    }),
+  ),
 });
 export type OrdenCompra = z.infer<typeof ordenCompraSchema>;
 

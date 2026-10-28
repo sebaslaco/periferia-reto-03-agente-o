@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "bun run scripts/modulo.ts --verificar && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "demo": "bun run demo.ts"
+    "demo": "bun run demo.ts",
+    "modulo": "bun run scripts/modulo.ts"
   },
   "dependencies": {
     "next": "^16.4.3",

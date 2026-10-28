@@ -86,7 +86,7 @@ export async function agregarLinea(ctx: ContextoHerramienta, relativa: string, l
 
 export async function registrarLlamada(
   ctx: ContextoHerramienta,
-  entrada: { herramienta: string; args: unknown; ok: boolean; error?: string; duracion_ms: number },
+  entrada: { herramienta: string; args: unknown; ok: boolean; data?: unknown; error?: string; duracion_ms: number },
 ): Promise<void> {
   await agregarLinea(ctx, "log.jsonl", JSON.stringify({ ts: fechaColombia(new Date()), sessionId: ctx.sessionId, ...entrada }));
 }
@@ -95,12 +95,21 @@ export async function registrarLlamada(
 
 export type ResultadoControl = "creada" | "idempotente" | "bloqueada" | "pendiente" | "rechazada";
 
-const ENCABEZADO_CONTROL = "solicitud_id,resultado,numero_oc,retroactiva,bloqueos,confirmaciones,ts";
+const ENCABEZADO_CONTROL = "solicitud_id,resultado,numero_oc,retroactiva,bloqueos,confirmaciones,ts,confirmado_por,confirmado_en";
 const csv = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
 export async function registrarControl(
   ctx: ContextoHerramienta,
-  fila: { solicitud_id: string; resultado: ResultadoControl; numero_oc: string | null; retroactiva: boolean; bloqueos: string[]; confirmaciones: string[] },
+  fila: {
+    solicitud_id: string;
+    resultado: ResultadoControl;
+    numero_oc: string | null;
+    retroactiva: boolean;
+    bloqueos: string[];
+    confirmaciones: string[];
+    confirmado_por: string | null;
+    confirmado_en: string | null;
+  },
 ): Promise<void> {
   const valores = [
     fila.solicitud_id,
@@ -110,6 +119,8 @@ export async function registrarControl(
     fila.bloqueos.join("|"),
     fila.confirmaciones.join("|"),
     fechaColombia(new Date()),
+    fila.confirmado_por ?? "",
+    fila.confirmado_en ?? "",
   ];
   await agregarLinea(ctx, "control.csv", valores.map(csv).join(","), ENCABEZADO_CONTROL);
 }

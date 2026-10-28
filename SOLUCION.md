@@ -63,6 +63,16 @@ flowchart LR
 
 Un cambio de reglas de negocio toca `src/domain/` y, si aplica, `src/knowledge/`; no toca el servidor ni el ciclo.
 
+**Módulo reutilizable (bonus PRD 9.4).** La carpeta `modulo/` empaqueta el agente para otras plataformas de agentes, sin el servidor:
+
+| Archivo | Qué es | Se genera desde |
+|---|---|---|
+| `modulo/agent.md` | Frontmatter `description`, `mode: primary`, `permission { edit: deny, bash: deny }` + el system prompt | `agent/prompt.md` |
+| `modulo/tools/oc.ts` | Re-exporta las 5 herramientas (sin copiar código) | `src/tools/oc.ts` |
+| `modulo/skill/ordenes-compra/SKILL.md` | Frontmatter `name`, `description` + el conocimiento del proceso | `src/knowledge/ordenes-compra.md` |
+
+Son las mismas piezas que usa la app: `bun run modulo` regenera `agent.md` y `SKILL.md` desde las fuentes, y `bun run modulo --verificar` falla si difieren. Esa verificación corre en `bun run build` (cada despliegue de Vercel se detiene si hay una copia divergente) y en `demo.ts`.
+
 ---
 
 ## 3. Ciclo del agente
@@ -83,6 +93,7 @@ Un cambio de reglas de negocio toca `src/domain/` y, si aplica, `src/knowledge/`
 2. El turno termina con una pregunta explícita. Si el modelo no la escribió, el sistema la agrega (solo si la respuesta no termina ya en pregunta). La API devuelve `needsConfirmation = true` y el chat resalta el mensaje con los botones **Confirmar** / **Cancelar**.
 3. `oc_crear` solo recibe `confirmado = true` si **el mensaje actual del usuario** es una confirmación ("confirmo", "sí, créala"…) **y** ese caso tiene una confirmación pendiente. Si el modelo envía `confirmado = true` sin eso, el backend lo **fuerza a `false`**, la herramienta responde que falta la confirmación, la tarjeta muestra el aviso y queda registro en `log.jsonl`.
 4. "Cancelar" o "no" descartan las confirmaciones pendientes.
+5. **Auditoría de la confirmación:** cuando `oc_crear` se ejecuta con `confirmado = true` validado por el backend, cada excepción de la OC queda con `confirmado_por = "analista (sesión <sessionId>)"` y `confirmado_en` (fecha de la confirmación) en `out/sap/ordenes.jsonl`, en las columnas `confirmado_por` y `confirmado_en` de `control.csv` y en el resultado registrado en `log.jsonl`. Una OC con excepciones sin confirmación registrada no se crea.
 
 Además, `oc_crear` vuelve a validar todo desde los fixtures antes de crear: si el modelo intenta crear una OC de una solicitud con bloqueos, la herramienta la rechaza y el intento queda en `out/control.csv` como **"bloqueada"** (HU-5). Lo mismo con "pendiente" (falta confirmación) e "idempotente" (ya existía).
 
@@ -105,13 +116,13 @@ Además, `oc_crear` vuelve a validar todo desde los fixtures antes de crear: si 
 | Entrada total del caso (el historial se reenvía en cada llamada) | ~131 000 caracteres ≈ **37 000 tokens** |
 | Salida total del caso (argumentos de herramientas + respuestas) | ≈ **2 000–3 000 tokens** |
 
-Con el precio de referencia de la gama Sonnet, USD 3 por millón de tokens de entrada y USD 15 por millón de salida **[REVISAR SEBAS: confirmar el precio publicado de `claude-sonnet-5-5`]**:
+Con el precio publicado de `claude-sonnet-5-5`: **USD 2 por millón de tokens de entrada y USD 10 por millón de salida** (fuente: [platform.claude.com/docs/en/about-claude/pricing](https://platform.claude.com/docs/en/about-claude/pricing)):
 
-- Entrada: 37 000 × 3 / 1 000 000 ≈ USD 0,11
-- Salida: 3 000 × 15 / 1 000 000 ≈ USD 0,05
-- **≈ USD 0,15 por caso con confirmación** (un caso sin confirmación, un solo turno, ≈ USD 0,08–0,10).
+- Entrada: 37 000 × 2 / 1 000 000 ≈ USD 0,074
+- Salida: 3 000 × 10 / 1 000 000 ≈ USD 0,03
+- **≈ USD 0,10 por caso con confirmación** (un caso sin confirmación, en un solo turno, ≈ USD 0,05–0,07).
 
-Cómo bajarlo: *prompt caching* del system prompt y de las herramientas (se repiten en cada llamada), devolver al modelo un resumen del paquete en lugar del texto completo de la cotización, y un modelo más pequeño para casos sin excepciones.
+Cómo bajarlo más: con *prompt caching* del system prompt, las definiciones de herramientas y el historial (se reenvían en cada llamada y son la mayor parte de la entrada), el costo por caso bajaría claramente por debajo de USD 0,10; además, devolver al modelo un resumen del paquete en lugar del texto completo de la cotización, y un modelo más pequeño para casos sin excepciones.
 
 ---
 
@@ -250,6 +261,7 @@ solo esconde el problema. Propongo segmentar el proceso:
 11. **`validez_hasta`** de la cotización = fecha de la cotización + días de validez.
 12. **`/tmp` efímero en Vercel**: las OC, logs y sesiones se pierden cuando la función se recicla; la numeración puede volver a 4500000001.
 13. **Una posición por solicitud**: los fixtures traen un solo ítem; el esquema admite varias.
+14. **`confirmado_en`**: se agregó a cada excepción del payload 7.4 (opcional, junto a `confirmado_por`) para registrar la fecha de la confirmación humana; en `control.csv` se agregaron al final las columnas `confirmado_por` y `confirmado_en`, sin cambiar las 7 columnas del PRD.
 
 ---
 
@@ -261,9 +273,9 @@ solo esconde el problema. Propongo segmentar el proceso:
 | HU-2 Validar | Hecho | `oc_validar` + `src/domain/reglas.ts`; los 6 casos en `demo.ts` | Maestros en línea desde SAP; reglas parametrizables (tolerancia 2 %, política de retroactivas) |
 | HU-3 Construir el payload | Hecho | Esquema zod 7.4; `out/<caso>/trazabilidad.json` | Varias posiciones, precio neto, campos de imputación reales de la empresa |
 | HU-4 Evidencia | Hecho (P0 txt y P1 pdf) | `aprobacion.txt` con sha256 y `aprobacion.pdf` | Firma digital o sello de tiempo si auditoría lo exige; adjuntar a la OC en SAP |
-| HU-5 Crear la OC | Hecho | `SapMock`, consecutivo desde 4500000001, idempotencia, `control.csv` con creada/idempotente/bloqueada/pendiente | Adaptador SAP real (sección 6) y almacenamiento persistente |
+| HU-5 Crear la OC | Hecho | `SapMock`, consecutivo desde 4500000001, idempotencia, `control.csv` con creada/idempotente/bloqueada/pendiente y quién confirmó cada excepción | Adaptador SAP real (sección 6) y almacenamiento persistente |
 | HU-6 Errores | Hecho | `{ ok: false, error }` legible para caso inexistente, JSON malformado, datos inválidos, montos no numéricos; nunca lanza | Alertas y monitoreo |
-| Bonus 9.4 módulo reutilizable | No hecho | — | Empaquetar `agent.md`, `tools/oc.ts` y `SKILL.md` |
+| Bonus 9.4 módulo reutilizable | Hecho | `modulo/` generado desde las fuentes de la app; `bun run modulo --verificar` en build y demo | Publicarlo como paquete versionado y probarlo en la plataforma de agentes destino |
 
 ---
 

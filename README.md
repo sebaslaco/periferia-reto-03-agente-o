@@ -30,6 +30,8 @@ Demo sin modelo de IA (no necesita clave): `bun install && bun run demo.ts`
 | `src/knowledge/ordenes-compra.md` | Conocimiento del proceso: reglas, maestros y qué hacer en cada excepción. |
 | `demo.ts` | Procesa sol-001 a sol-006 llamando las herramientas sin modelo de IA; verifica el resultado esperado. |
 | `fixtures/reto-03/` | Maestros y casos del reto (`sol-001` a `sol-006`), solo lectura. |
+| `modulo/` | Bonus PRD 9.4: el agente empaquetado (`agent.md`, `tools/oc.ts`, `skill/ordenes-compra/SKILL.md`) sin depender del servidor. |
+| `scripts/modulo.ts` | Genera y verifica `modulo/` desde las fuentes de la app. |
 | `SOLUCION.md` | Documento de la solución (arquitectura, controles, adaptador SAP, análisis). |
 
 ## Requisitos
@@ -52,10 +54,28 @@ cp .env.example .env.local   # y escribe tu ANTHROPIC_API_KEY en .env.local
 bun run dev          # abre http://localhost:3000
 bun run demo.ts      # demo sin IA: procesa sol-001 a sol-006 y verifica el resultado esperado
 bun run typecheck    # revisa tipos
-bun run build        # compila como en producción
+bun run build        # verifica modulo/ y compila como en producción
+bun run modulo       # regenera modulo/ desde agent/prompt.md y src/knowledge/
 ```
 
 Salidas en `out/` (configurable con `OUT_DIR`; en Vercel se usa `/tmp/out`): `sap/ordenes.jsonl`, `control.csv`, `log.jsonl` y, por caso, `trazabilidad.json`, `aprobacion.txt` y `aprobacion.pdf`.
+
+## Módulo reutilizable (`modulo/`)
+
+El agente empaquetado para otras plataformas de agentes (PRD 9.4), sin depender del servidor:
+
+| Archivo | Contenido | Fuente única |
+|---|---|---|
+| `modulo/agent.md` | Frontmatter (`description`, `mode: primary`, `permission: { edit: deny, bash: deny }`) + system prompt | `agent/prompt.md` |
+| `modulo/tools/oc.ts` | Re-exporta las herramientas (`leer_paquete`, `validar`, `construir_payload`, `generar_evidencia`, `crear`) | `src/tools/oc.ts` |
+| `modulo/skill/ordenes-compra/SKILL.md` | Frontmatter (`name`, `description`) + conocimiento del proceso | `src/knowledge/ordenes-compra.md` |
+
+```bash
+bun run modulo               # regenera agent.md y SKILL.md tras cambiar el prompt o el conocimiento
+bun run modulo --verificar   # falla si modulo/ difiere de las fuentes
+```
+
+La verificación corre en `bun run build` (y por tanto en cada despliegue de Vercel) y en `demo.ts`: no puede quedar una copia divergente.
 
 ## API
 

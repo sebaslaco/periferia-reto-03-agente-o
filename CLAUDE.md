@@ -53,3 +53,4 @@ Next.js (App Router) + Bun + TypeScript estricto + Vercel AI SDK (proveedor Anth
 - Comportamiento: `agent/prompt.md` · Conocimiento: `src/knowledge/ordenes-compra.md` · Ejecución: `src/tools/oc.ts`.
 - Reglas de negocio puras: `src/domain/` · Disco: `src/infra/archivos.ts` · SAP: `src/sap/adapter.ts` (interfaz) y `src/sap/mock.ts`.
 - Ciclo del agente: `src/agent/loop.ts` (confirmación humana aplicada en código) · Proveedor LLM: `src/llm/adapter.ts` + `src/llm/anthropic.ts` · API: `app/api/{chat,sessions/[id],health}`.
+- Módulo reutilizable: `modulo/` se genera con `bun run modulo` desde `agent/prompt.md` y `src/knowledge/`; `bun run build` y `demo.ts` fallan si difiere.
