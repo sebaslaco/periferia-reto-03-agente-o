@@ -4,15 +4,14 @@ import { anthropic } from "@ai-sdk/anthropic";
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
-  getToolName,
   isStepCount,
-  isToolUIPart,
   streamText,
+  tool,
   toUIMessageStream,
   type UIMessage,
 } from "ai";
-import { sap } from "@/src/sap/sap-simulado";
-import { crearHerramientas, herramientasConConfirmacion, registrarDecisionHumana } from "@/src/tools/oc";
+import { z } from "zod";
+import * as oc from "@/src/tools/oc";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,23 +24,38 @@ async function cargarSystemPrompt(): Promise<string> {
   return promptEnCache;
 }
 
-/** Deja en auditoría lo que el humano decidió (Confirmar / Cancelar) en el último mensaje. */
-function auditarDecisiones(messages: UIMessage[]) {
-  const ultimo = messages.at(-1);
-  if (ultimo?.role !== "assistant") return;
-  for (const part of ultimo.parts) {
-    if (!isToolUIPart(part) || part.state !== "approval-responded" || part.approval.isAutomatic) continue;
-    const input = (part.input ?? {}) as { solicitud_id?: unknown };
-    registrarDecisionHumana(
-      { sap, actor: "usuario" },
-      {
-        herramienta: getToolName(part),
-        aprobado: part.approval.approved,
-        solicitudId: typeof input.solicitud_id === "string" ? input.solicitud_id : undefined,
-        motivo: part.approval.reason,
-      },
-    );
-  }
+/**
+ * Puente provisional (fase A): expone las herramientas oc_* al AI SDK con el nombre <archivo>_<export>.
+ * El ciclo del agente definitivo (adaptador LLM, sesiones, confirmación en el chat) llega en la fase B.
+ */
+function herramientas(ctx: oc.ContextoHerramienta) {
+  return {
+    oc_leer_paquete: tool({
+      description: oc.leer_paquete.description,
+      inputSchema: z.object(oc.leer_paquete.args),
+      execute: (a) => oc.leer_paquete.execute(a, ctx),
+    }),
+    oc_validar: tool({
+      description: oc.validar.description,
+      inputSchema: z.object(oc.validar.args),
+      execute: (a) => oc.validar.execute(a, ctx),
+    }),
+    oc_construir_payload: tool({
+      description: oc.construir_payload.description,
+      inputSchema: z.object(oc.construir_payload.args),
+      execute: (a) => oc.construir_payload.execute(a, ctx),
+    }),
+    oc_generar_evidencia: tool({
+      description: oc.generar_evidencia.description,
+      inputSchema: z.object(oc.generar_evidencia.args),
+      execute: (a) => oc.generar_evidencia.execute(a, ctx),
+    }),
+    oc_crear: tool({
+      description: oc.crear.description,
+      inputSchema: z.object(oc.crear.args),
+      execute: (a) => oc.crear.execute(a, ctx),
+    }),
+  };
 }
 
 /** Lo único que ve el usuario cuando algo falla; el detalle técnico va solo a los logs del servidor. */
@@ -58,16 +72,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { messages } = (await req.json()) as { messages: UIMessage[] };
-    auditarDecisiones(messages);
-
-    const tools = crearHerramientas({ sap, actor: "agente" });
+    const { messages, id } = (await req.json()) as { messages: UIMessage[]; id?: string };
+    const tools = herramientas({ directory: process.cwd(), sessionId: id ?? "web" });
     const result = streamText({
       model: anthropic(process.env.ANTHROPIC_MODEL || MODELO_POR_DEFECTO),
       system: await cargarSystemPrompt(),
       messages: await convertToModelMessages(messages, { tools }),
       tools,
-      toolApproval: Object.fromEntries(herramientasConConfirmacion.map((h) => [h, "user-approval" as const])),
+      toolApproval: { oc_crear: "user-approval" },
       stopWhen: isStepCount(10),
     });
 

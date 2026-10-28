@@ -27,28 +27,28 @@ Next.js (App Router) + Bun + TypeScript estricto + Vercel AI SDK (proveedor Anth
 - Al terminar cada fase, haz **push a `main`** (Vercel publica solo desde `main`).
 - No agregues funcionalidades que no se pidieron.
 
-## Hipótesis de trabajo (validar contra el PRD; el PRD siempre manda)
-
-### Controles y su salida
-| # | Control | Si falla |
+## Reglas de control (PRD 7.3 — el PRD manda sobre este archivo)
+| # | Regla | Tipo |
 |---|---|---|
-| 1 | Documentos completos | Rechazar |
-| 2 | Solicitud sin OC previa (duplicado) | Rechazar |
-| 3 | Proveedor existe y está activo | Rechazar |
-| 4 | NIT de la cotización coincide con el maestro | Rechazar |
-| 5 | Centro de costo y subárea válidos | Rechazar |
-| 6 | Monto de la solicitud = cotización | Rechazar |
-| 7 | IVA y plazo de pago válidos | Rechazar |
-| 8 | Aprobación del líder del centro | Rechazar |
-| 9 | Monto dentro del tope del líder | Escalar (aprobador superior) |
-| 10 | Sin factura previa a la OC | Escalar (compra retroactiva) |
+| RC1 | Proveedor existe en `proveedores.json` (por NIT; sin NIT, por nombre normalizado) y está `activo`. | Bloqueo |
+| RC2 | Aprobación existe, contiene "Aprobado" y viene de un aprobador listado del `centro_costo`. | Bloqueo |
+| RC3 | `valor_total` ≤ `tope` del aprobador para ese centro. | Bloqueo |
+| RC4 | `subarea` pertenece al `centro_costo`. | Bloqueo |
+| RC5 | Diferencia cotización vs solicitud ≤ 2 % (si excede o no hay cotización: confirmar). | Confirmación |
+| RC6 | Sin `indicador_iva` → se deriva del proveedor y se confirma. | Confirmación + derivado |
+| RC7 | Sin `condiciones_pago` → se deriva del proveedor; solo se informa. | Derivado |
+| RC8 | Factura con fecha < `fecha_solicitud` → `retroactiva = true`; confirmar y registrar en control. | Confirmación |
+| RC9 | Fecha de aprobación (día) ≥ `fecha_solicitud`; si no, confirmar. | Confirmación |
+| RC10 | `cantidad × valor_unitario` = `valor_total` (± 1). | Bloqueo |
 
-Criterio: lo objetivo y corregible por el solicitante se **rechaza**; lo válido que requiere más autoridad o regularización se **escala**. Si todo pasa: resumen → confirmación humana → crear OC.
+`oc_crear` solo crea si `apta = true` y (confirmaciones vacías o `confirmado = true`). Idempotente por `solicitud_id`.
 
-### Modelo de datos
-- **Maestros:** Proveedor (nit, nombre, estado, condicion_pago), CentroCosto (codigo, subarea, lider, tope_aprobacion), IndicadorIva (codigo, tasa), CondicionPago (codigo, dias).
-- **Caso:** Correo, Solicitud (id, proveedor, centro_costo, monto, fecha), Item, Cotizacion, Aprobacion, Factura (opcional).
-- **Resultados:** OrdenCompra (numero, solicitud_id, estado, fecha_creacion), EventoAuditoria.
-- Relaciones clave: Solicitud → OrdenCompra (0..1); Solicitud → Factura (0..1); Solicitud → EventoAuditoria (0..n).
+## Datos (PRD 7.1, 7.2, 7.4)
+- **Fixtures por caso** (`fixtures/reto-03/solicitudes/<caso>/`): `correo.json`, `solicitud.json`, `cotizacion.txt`, `aprobacion.json`, `factura.txt` (solo retroactivo).
+- **Maestros**: proveedores (`codigo_sap, nit, nombre, condiciones_pago_default, indicador_iva_default, activo`), centros de costo (`centro_costo, subareas[], aprobadores[{email, tope}]`), indicadores de IVA, condiciones de pago.
+- **Paquete normalizado**: `{ correo, solicitud, cotizacion|null, aprobacion|null, factura|null }`.
+- **Salidas** (`OUT_DIR`, por defecto `./out`; en Vercel `/tmp/out`): `sap/ordenes.jsonl`, `control.csv`, `log.jsonl`, `<caso>/trazabilidad.json`, `<caso>/aprobacion.txt|pdf`.
 
-Ajusta nombres y campos a los JSON reales de `fixtures/reto-03/` cuando estén disponibles.
+## Dónde vive cada cosa
+- Comportamiento: `agent/prompt.md` · Conocimiento: `src/knowledge/ordenes-compra.md` · Ejecución: `src/tools/oc.ts`.
+- Reglas de negocio puras: `src/domain/` · Disco: `src/infra/archivos.ts` · SAP: `src/sap/adapter.ts` (interfaz) y `src/sap/mock.ts`.

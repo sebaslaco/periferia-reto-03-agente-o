@@ -106,7 +106,7 @@ export default function Chat() {
 
       <section className="mensajes">
         {messages.length === 0 && (
-          <div className="vacio">Escribe un mensaje para empezar. Prueba: “haz un ping”.</div>
+          <div className="vacio">Escribe un mensaje para empezar. Prueba: “Procesa la solicitud sol-001”.</div>
         )}
         {messages.map((m) => (
           <div key={m.id} className={`mensaje ${m.role}`}>
