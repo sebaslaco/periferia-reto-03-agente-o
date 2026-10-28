@@ -1,133 +1,160 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
-import {
-  DefaultChatTransport,
-  getToolName,
-  isToolUIPart,
-  lastAssistantMessageIsCompleteWithApprovalResponses,
-  type DynamicToolUIPart,
-  type ToolUIPart,
-} from "ai";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
-type ParteHerramienta = ToolUIPart | DynamicToolUIPart;
-
-const ESTADOS: Record<ParteHerramienta["state"], { texto: string; clase: string }> = {
-  "input-streaming": { texto: "Preparando…", clase: "pendiente" },
-  "input-available": { texto: "Ejecutando…", clase: "pendiente" },
-  "approval-requested": { texto: "Requiere tu confirmación", clase: "espera" },
-  "approval-responded": { texto: "Respuesta enviada", clase: "pendiente" },
-  "output-available": { texto: "Completada", clase: "ok" },
-  "output-error": { texto: "Error", clase: "error" },
-  "output-denied": { texto: "Cancelada por el usuario", clase: "error" },
-};
+import type { EntradaHistorial, RespuestaChat, ToolCallVisible } from "@/src/agent/tipos";
 
 /** Mensaje único para cualquier error: el detalle técnico queda solo en los logs del servidor. */
 const MENSAJE_ERROR = "No pude procesar la solicitud, intenta de nuevo";
+const CLAVE_SESION = "agente-oc:sessionId";
+
+function nuevaSesion(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}
+
+function leerSesionGuardada(): string | null {
+  try {
+    return localStorage.getItem(CLAVE_SESION);
+  } catch {
+    return null;
+  }
+}
+
+function guardarSesion(id: string) {
+  try {
+    localStorage.setItem(CLAVE_SESION, id);
+  } catch {}
+}
 
 function Json({ valor }: { valor: unknown }) {
   return <pre className="json">{JSON.stringify(valor, null, 2)}</pre>;
 }
 
-function TarjetaHerramienta({
-  part,
-  responder,
-  ocupado,
-}: {
-  part: ParteHerramienta;
-  responder: (id: string, aprobado: boolean) => void;
-  ocupado: boolean;
-}) {
-  const estado = ESTADOS[part.state];
-  const pideConfirmacion = part.state === "approval-requested" && !part.approval.isAutomatic;
-
+function TarjetaHerramienta({ t }: { t: ToolCallVisible }) {
+  const clase = t.ok ? "ok" : "error";
   return (
-    <div className={`tarjeta ${estado.clase}`}>
+    <div className={`tarjeta ${clase}`}>
       <div className="tarjeta-cabecera">
-        <span className="herramienta">🔧 {getToolName(part)}</span>
-        <span className={`estado ${estado.clase}`}>{estado.texto}</span>
+        <span className="herramienta">🔧 {t.nombre}</span>
+        <span className={`estado ${clase}`}>{t.ok ? "OK" : "Error"}</span>
       </div>
-      {part.input !== undefined && (
-        <>
-          <div className="etiqueta">Entrada</div>
-          <Json valor={part.input} />
-        </>
-      )}
-      {part.state === "output-available" && (
-        <>
-          <div className="etiqueta">Salida</div>
-          <Json valor={part.output} />
-        </>
-      )}
-      {part.state === "output-error" && <div className="error-texto">{MENSAJE_ERROR}</div>}
-      {pideConfirmacion && (
-        <div className="confirmacion">
-          <p>Esta acción necesita aprobación humana antes de ejecutarse. ¿Deseas continuar?</p>
-          {part.approval.requestReason && <p className="motivo">{part.approval.requestReason}</p>}
-          <div className="botones">
-            <button className="confirmar" disabled={ocupado} onClick={() => responder(part.approval.id, true)}>
-              Confirmar
-            </button>
-            <button className="cancelar" disabled={ocupado} onClick={() => responder(part.approval.id, false)}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
+      <div className="resumen">{t.resumen}</div>
+      {t.nota && <div className="nota">⚠️ {t.nota}</div>}
+      <details>
+        <summary>Argumentos</summary>
+        <Json valor={t.args} />
+      </details>
+      <details>
+        <summary>Resultado completo</summary>
+        <Json valor={t.resultado} />
+      </details>
     </div>
   );
 }
 
 export default function Chat() {
-  const { messages, sendMessage, addToolApprovalResponse, status, error, stop } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-  });
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [historial, setHistorial] = useState<EntradaHistorial[]>([]);
   const [texto, setTexto] = useState("");
+  const [pensando, setPensando] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
-  const ocupado = status === "submitted" || status === "streaming";
+
+  // Recupera la sesión guardada (si el servidor aún la conserva) o crea una nueva.
+  useEffect(() => {
+    const guardada = leerSesionGuardada();
+    const id = guardada ?? nuevaSesion();
+    setSessionId(id);
+    guardarSesion(id);
+    if (!guardada) return;
+    fetch(`/api/sessions/${id}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ historial: EntradaHistorial[] }>) : null))
+      .then((s) => s && setHistorial(s.historial))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [historial, pensando]);
 
-  const responder = (id: string, aprobado: boolean) =>
-    addToolApprovalResponse({ id, approved: aprobado, reason: aprobado ? undefined : "Cancelado por el usuario" });
+  async function enviar(mensaje: string) {
+    if (!sessionId || !mensaje.trim() || pensando) return;
+    const ahora = new Date().toISOString();
+    setHistorial((h) => [...h, { rol: "usuario", texto: mensaje, ts: ahora }]);
+    setTexto("");
+    setPensando(true);
+    try {
+      const r = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId, message: mensaje }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      const datos = (await r.json()) as RespuestaChat;
+      setHistorial((h) => [
+        ...h,
+        { rol: "asistente", texto: datos.reply, ts: new Date().toISOString(), toolCalls: datos.toolCalls, needsConfirmation: datos.needsConfirmation },
+      ]);
+    } catch {
+      setHistorial((h) => [...h, { rol: "asistente", texto: MENSAJE_ERROR, ts: new Date().toISOString() }]);
+    } finally {
+      setPensando(false);
+    }
+  }
+
+  function reiniciar() {
+    const id = nuevaSesion();
+    guardarSesion(id);
+    setSessionId(id);
+    setHistorial([]);
+  }
+
+  const ultimo = historial.at(-1);
+  const esperaConfirmacion = !pensando && ultimo?.rol === "asistente" && ultimo.needsConfirmation === true;
 
   return (
     <main className="contenedor">
       <header>
-        <h1>Asistente de órdenes de compra</h1>
-        <p>SAP simulado · toda acción que crea una orden requiere tu confirmación</p>
+        <div>
+          <h1>Asistente de órdenes de compra</h1>
+          <p>SAP simulado · ninguna orden se crea con excepciones sin tu confirmación</p>
+        </div>
+        <button type="button" className="secundario" onClick={reiniciar} disabled={pensando}>
+          Nueva conversación
+        </button>
       </header>
 
       <section className="mensajes">
-        {messages.length === 0 && (
-          <div className="vacio">Escribe un mensaje para empezar. Prueba: “Procesa la solicitud sol-001”.</div>
+        {historial.length === 0 && (
+          <div className="vacio">Escribe un mensaje para empezar. Prueba: “Procesa la solicitud sol-004”.</div>
         )}
-        {messages.map((m) => (
-          <div key={m.id} className={`mensaje ${m.role}`}>
-            <div className="autor">{m.role === "user" ? "Tú" : "Asistente"}</div>
-            {m.parts.map((part, i) => {
-              if (part.type === "text")
-                return m.role === "assistant" ? (
-                  <div key={i} className="markdown">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <p key={i} className="texto">{part.text}</p>
-                );
-              if (isToolUIPart(part))
-                return <TarjetaHerramienta key={part.toolCallId} part={part} responder={responder} ocupado={ocupado} />;
-              return null;
-            })}
+        {historial.map((m, i) => (
+          <div key={i} className={`mensaje ${m.rol}${m.needsConfirmation ? " confirmacion-pendiente" : ""}`}>
+            <div className="autor">{m.rol === "usuario" ? "Tú" : "Asistente"}</div>
+            {m.toolCalls?.map((t, j) => <TarjetaHerramienta key={j} t={t} />)}
+            {m.rol === "asistente" ? (
+              <div className="markdown">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.texto}</ReactMarkdown>
+              </div>
+            ) : (
+              <p className="texto">{m.texto}</p>
+            )}
+            {m.needsConfirmation && i === historial.length - 1 && esperaConfirmacion && (
+              <div className="confirmacion">
+                <p>⏸️ El agente espera tu confirmación para crear la orden de compra.</p>
+                <div className="botones">
+                  <button className="confirmar" onClick={() => enviar("confirmo")}>
+                    Confirmar
+                  </button>
+                  <button className="cancelar" onClick={() => enviar("cancelar")}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
-        {status === "submitted" && <div className="pensando">Pensando…</div>}
-        {error && <div className="error-global">{MENSAJE_ERROR}</div>}
+        {pensando && <div className="pensando">Pensando…</div>}
         <div ref={finRef} />
       </section>
 
@@ -135,26 +162,13 @@ export default function Chat() {
         className="entrada"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!texto.trim() || ocupado) return;
-          sendMessage({ text: texto });
-          setTexto("");
+          void enviar(texto);
         }}
       >
-        <input
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder="Escribe tu mensaje…"
-          aria-label="Mensaje"
-        />
-        {ocupado ? (
-          <button type="button" onClick={() => stop()}>
-            Detener
-          </button>
-        ) : (
-          <button type="submit" disabled={!texto.trim()}>
-            Enviar
-          </button>
-        )}
+        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escribe tu mensaje…" aria-label="Mensaje" disabled={pensando} />
+        <button type="submit" disabled={!texto.trim() || pensando}>
+          Enviar
+        </button>
       </form>
     </main>
   );

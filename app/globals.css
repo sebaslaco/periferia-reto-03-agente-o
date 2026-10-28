@@ -28,6 +28,7 @@ body {
   padding: 16px;
 }
 
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 header h1 { margin: 0; font-size: 1.4rem; }
 header p { margin: 4px 0 12px; color: var(--suave); font-size: 0.9rem; }
 
@@ -35,7 +36,7 @@ header p { margin: 4px 0 12px; color: var(--suave); font-size: 0.9rem; }
 .vacio, .pensando { color: var(--suave); font-style: italic; }
 
 .mensaje { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 10px 14px; }
-.mensaje.user { background: #e9f0ff; border-color: #c9d8fb; align-self: flex-end; max-width: 85%; }
+.mensaje.usuario { background: #e9f0ff; border-color: #c9d8fb; align-self: flex-end; max-width: 85%; }
 .autor { font-size: 0.75rem; font-weight: 600; color: var(--suave); margin-bottom: 4px; }
 .texto { margin: 4px 0; white-space: pre-wrap; line-height: 1.45; }
 
@@ -65,7 +66,12 @@ header p { margin: 4px 0 12px; color: var(--suave); font-size: 0.9rem; }
 .json { margin: 4px 0; background: #f0f2f5; padding: 8px; border-radius: 6px; font-size: 0.8rem; overflow-x: auto; }
 .error-texto, .error-global { color: var(--error); font-size: 0.9rem; }
 
-.confirmacion { margin-top: 10px; }
+.mensaje.confirmacion-pendiente { border-color: var(--espera); box-shadow: 0 0 0 2px #fdf0d9; }
+.resumen { margin-top: 6px; font-size: 0.9rem; }
+.nota { margin-top: 6px; font-size: 0.85rem; color: var(--espera); }
+details { margin-top: 6px; font-size: 0.85rem; }
+summary { cursor: pointer; color: var(--suave); }
+.confirmacion { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fffaf0; border: 1px solid #f3d9a4; }
 .confirmacion p { margin: 4px 0; }
 .motivo { color: var(--suave); font-size: 0.85rem; }
 .botones { display: flex; gap: 8px; margin-top: 6px; }
@@ -74,6 +80,7 @@ button { border: none; border-radius: 8px; padding: 8px 16px; font-size: 0.95rem
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 button.confirmar { background: var(--ok); }
 button.cancelar { background: var(--error); }
+button.secundario { background: #eceff3; color: var(--texto); }
 
 .entrada { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 12px 0; background: var(--fondo); }
 .entrada input { flex: 1; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 8px; font-size: 1rem; }

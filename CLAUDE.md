@@ -52,3 +52,4 @@ Next.js (App Router) + Bun + TypeScript estricto + Vercel AI SDK (proveedor Anth
 ## Dónde vive cada cosa
 - Comportamiento: `agent/prompt.md` · Conocimiento: `src/knowledge/ordenes-compra.md` · Ejecución: `src/tools/oc.ts`.
 - Reglas de negocio puras: `src/domain/` · Disco: `src/infra/archivos.ts` · SAP: `src/sap/adapter.ts` (interfaz) y `src/sap/mock.ts`.
+- Ciclo del agente: `src/agent/loop.ts` (confirmación humana aplicada en código) · Proveedor LLM: `src/llm/adapter.ts` + `src/llm/anthropic.ts` · API: `app/api/{chat,sessions/[id],health}`.

@@ -10,9 +10,6 @@
     "demo": "bun run demo.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.89",
-    "@ai-sdk/react": "^4.0.158",
-    "ai": "^7.0.154",
     "next": "^16.4.3",
     "pdf-lib": "^1.17.1",
     "react": "^19.3.1",
