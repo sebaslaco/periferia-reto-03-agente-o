@@ -140,10 +140,16 @@ function necesitaConfirmacion(sesion: Sesion, tocados: Set<string>): boolean {
   return [...tocados].some((c) => sesion.pendientes[c]);
 }
 
+/** ¿El último párrafo ya es una pregunta? Ignora markdown y emojis al final ("**¿Confirmas…?**"). */
+export function terminaEnPregunta(texto: string): boolean {
+  const ultimaLinea = texto.trim().split("\n").at(-1) ?? "";
+  return ultimaLinea.replace(/[^\p{L}\p{N}?]+$/u, "").endsWith("?");
+}
+
 /** CA3: si queda una confirmación pendiente, el turno termina con una pregunta explícita. */
 function cerrarTurno(texto: string, sesion: Sesion, tocados: Set<string>): string {
   const casos = [...tocados].filter((c) => sesion.pendientes[c]);
-  if (casos.length === 0 || texto.trim().endsWith("?")) return texto || "Listo.";
+  if (casos.length === 0 || terminaEnPregunta(texto)) return texto || "Listo.";
   const detalle = casos.map((c) => `${c}${sesion.pendientes[c]!.reglas.length ? ` (${sesion.pendientes[c]!.reglas.join(", ")})` : ""}`).join(", ");
   return `${texto ? `${texto}\n\n` : ""}**¿Confirmas que cree la orden de compra de ${detalle} con estas excepciones?** Responde «confirmo» o «cancelar».`;
 }

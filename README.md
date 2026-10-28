@@ -4,6 +4,17 @@ Agente conversacional de órdenes de compra – Prueba IA Periferia (Reto 3).
 
 Chat web en español que conversa con Claude, llama herramientas tipadas con zod y crea órdenes de compra en un **SAP simulado**, siempre con **confirmación humana** antes de crear la OC.
 
+**Link de prueba:** https://agente-oc-periferia.vercel.app (público, sin clave de acceso) · Diseño y decisiones: [SOLUCION.md](SOLUCION.md)
+
+## Inicio rápido (un comando)
+
+```bash
+cp .env.example .env.local   # escribe tu ANTHROPIC_API_KEY en .env.local
+bun install && bun run dev   # http://localhost:3000
+```
+
+Demo sin modelo de IA (no necesita clave): `bun install && bun run demo.ts`
+
 ## Estructura
 
 | Ruta | Qué es |
@@ -18,7 +29,7 @@ Chat web en español que conversa con Claude, llama herramientas tipadas con zod
 | `src/sap/adapter.ts`, `src/sap/mock.ts` | Interfaz `SapAdapter` y SAP simulado sobre archivos (`out/sap/ordenes.jsonl`). |
 | `src/knowledge/ordenes-compra.md` | Conocimiento del proceso: reglas, maestros y qué hacer en cada excepción. |
 | `demo.ts` | Procesa sol-001 a sol-006 llamando las herramientas sin modelo de IA; verifica el resultado esperado. |
-| `fixtures/reto-03/` | Aquí van los maestros y casos del reto (`sol-001` a `sol-006`). |
+| `fixtures/reto-03/` | Maestros y casos del reto (`sol-001` a `sol-006`), solo lectura. |
 | `SOLUCION.md` | Documento de la solución (arquitectura, controles, adaptador SAP, análisis). |
 
 ## Requisitos
@@ -26,7 +37,7 @@ Chat web en español que conversa con Claude, llama herramientas tipadas con zod
 - [Bun](https://bun.sh) 1.x
 - Una API key de Anthropic (solo para el chat; la demo no la necesita).
 
-## Instalación
+## Instalación paso a paso
 
 ```bash
 bun install
@@ -39,7 +50,7 @@ cp .env.example .env.local   # y escribe tu ANTHROPIC_API_KEY en .env.local
 
 ```bash
 bun run dev          # abre http://localhost:3000
-bun run demo.ts      # demo sin IA (también: bun run demo)
+bun run demo.ts      # demo sin IA: procesa sol-001 a sol-006 y verifica el resultado esperado
 bun run typecheck    # revisa tipos
 bun run build        # compila como en producción
 ```
@@ -68,9 +79,12 @@ curl -s -X POST http://localhost:3000/api/chat -H 'content-type: application/jso
 
 ## Variables de entorno
 
+Todas están en [`.env.example`](.env.example), sin valores.
+
+
 | Variable | Obligatoria | Por defecto |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Sí (solo para el chat) | — |
+| `ANTHROPIC_API_KEY` | Sí (solo para el chat; la demo no la usa) | — |
 | `ANTHROPIC_MODEL` | No | `claude-sonnet-5-5` |
 | `MAX_ITERACIONES` | No | `25` |
 | `MAX_TOKENS_SESION` | No | `300000` |

@@ -27,6 +27,7 @@ import {
 } from "../domain/tipos";
 import {
   cargarMaestros,
+  directorioSalida,
   escribirSalida,
   leerTextoOpcional,
   parsearJson,
@@ -151,6 +152,11 @@ async function recalcular(ctx: ContextoHerramienta, caso: string) {
   return { paquete, validacion, payload };
 }
 
+/** Ruta legible relativa a la carpeta de salida, p. ej. "out/sol-004/aprobacion.txt" (también en Vercel). */
+function rutaVisible(ctx: ContextoHerramienta, ruta: string): string {
+  return path.posix.join("out", path.relative(directorioSalida(ctx), ruta).split(path.sep).join("/"));
+}
+
 const codigos = (v: Validacion) => ({ bloqueos: v.bloqueos.map((b) => b.regla), confirmaciones: v.confirmaciones.map((c) => c.regla) });
 
 // ---------- Herramientas ----------
@@ -196,7 +202,7 @@ export const construir_payload = {
       exigirIgual(derivados, r.validacion.derivados, "Los derivados recibidos");
       if (!r.payload.ok) throw new ErrorHerramienta(r.payload.error);
       const ruta = await escribirSalida(ctx, path.join(caso, "trazabilidad.json"), JSON.stringify(r.payload.trazabilidad, null, 2));
-      return { payload: r.payload.orden, trazabilidad: path.relative(ctx.directory, ruta) };
+      return { payload: r.payload.orden, trazabilidad: rutaVisible(ctx, ruta) };
     }),
 };
 
@@ -211,7 +217,7 @@ export const generar_evidencia = {
       const contenido = contenidoEvidencia(aprobacion);
       const rutaTxt = await escribirSalida(ctx, path.join(caso, "aprobacion.txt"), textoEvidencia(contenido));
       const rutaPdf = await escribirSalida(ctx, path.join(caso, "aprobacion.pdf"), await pdfEvidencia(contenido));
-      return { ruta: path.relative(ctx.directory, rutaTxt), ruta_pdf: path.relative(ctx.directory, rutaPdf), sha256: sha256(contenido) };
+      return { ruta: rutaVisible(ctx, rutaTxt), ruta_pdf: rutaVisible(ctx, rutaPdf), sha256: sha256(contenido) };
     }),
 };
 
